@@ -19,8 +19,15 @@ type User struct {
 	Password string `json:"password"`
 }
 
+type Domain struct {
+	Users []string
+	Operations []string
+}
+
+var domains2 = make(map[string]Domain)
 var domains = make(map[string][]string)
 var users []User = make([]User, 0)
+var types = make(map[string][]string)
 
 func printUsage() {
 	fmt.Print("Usage: ./auth <command> [options...]\n",
@@ -41,6 +48,7 @@ func sync() {
 	}
 	syncContainer(usersFile, users)
 	syncContainer(domainsFile, domains)
+	syncContainer(typesFile, types)
 }
 
 func fetchTables() {
@@ -59,8 +67,11 @@ func fetchTables() {
 	}
 	fetch(usersFile, &users)
 	fetch(domainsFile, &domains)
+	fetch(typesFile, &types)
 }
 
+// Defines a new user with a password.
+// The username CANNOT be an empty string. The password CAN be an empty string.
 func addUser(username, pass string) string {
 	if username == "" {
 		return "Error: username missing"
@@ -78,6 +89,7 @@ func addUser(username, pass string) string {
 	return "Success"
 }
 
+// Validates a user's password by username and password.
 func authenticate(username, pass string) string {
 	for _, elm := range users {
 		if elm.Username == username {
@@ -90,11 +102,21 @@ func authenticate(username, pass string) string {
 	return "Error: no such user"
 }
 
+// Assign a user to a domain.
+// If the domain name does not exist, it will be created.
+// If a user does not exist, this function will return an error.
+// A user may belong to multiple domains, but domains can not have duplicates.
+// The domain name must be a non-empty string.
 func setDomain(user, dName string) string {
 	v, ok := domains[dName]
 	if !ok {
 		v = make([]string, 0)
 		domains[dName] = v
+	}
+	for _, elm := range v {
+		if elm == user {
+			return "Error: user exists"
+		}
 	}
 	for _, elm := range users {
 		if elm.Username == user {
@@ -107,10 +129,22 @@ func setDomain(user, dName string) string {
 	return "Error: no such user"
 }
 
+// List all the users within a domain.
+// User output will be newline seperated.
+// If the domain does not exist OR the domain has no users, there will be no output.
+// The passed in domain name must NOT be empty.
+func domainInfo(args []string) {
+	if len(args) > 1 {
+		fmt.Println("Error: too many arguments for DomainInfo")
+		return
+	} else if len(args) < 1 {
+		fmt.Println("Error: too few arguments for DomainInfo")
+		return
+	}
 
-func domainInfo(dName string) string {
+	dName := args[0]
 	if dName == "" {
-		return "Error missing domain"
+		fmt.Println("Error missing name of domain")
 	}
 
 	if v, ok := domains[dName]; ok {
@@ -118,7 +152,66 @@ func domainInfo(dName string) string {
 			fmt.Println(name)
 		}
 	}
-	return ""
+}
+
+func setType(args []string) {
+	if len(args) < 2 {
+		fmt.Println("Error: not enough arguments to SetType!")
+		return
+	} else if len(args) > 2 {
+		fmt.Println("Error: too many arguments to SetType!")
+		return
+	}
+
+	objName, typeName := args[0], args[1]
+	if objName == "" {
+		fmt.Println("Error: objectname is empty")
+		return
+	} else if typeName == "" {
+		fmt.Println("Error: type is empty")
+		return
+	}
+
+	objs, ok := types[typeName]
+	if !ok {
+		objs = make([]string, 0)
+	}
+	objs = append(objs, objName)
+	types[typeName] = objs
+	fmt.Println("Success")
+}
+
+func typeInfo(args []string) {
+	if len(args) > 1 {
+		fmt.Println("Error: too many arguments for TypeInfo")
+		return
+	} else if len(args) < 1 {
+		fmt.Println("Error: not enough arguments for TypeInfo")
+		return
+	}
+
+	typeName := args[0]
+	if typeName == "" {
+		fmt.Println("Error: type is empty")
+		return
+	}
+
+	objs, ok := types[typeName]
+	if !ok || len(objs) == 0 {
+		return
+	}
+
+	for _, obj := range objs {
+		fmt.Println(obj)
+	}
+}
+
+func addAccess(args []string) {
+
+}
+
+func canAccess(args []string) {
+
 }
 
 func cleanup_and_exit() {
@@ -129,44 +222,48 @@ func cleanup_and_exit() {
 func main() {
 	args := os.Args[1:]
 
+	if len(args) == 0 {
+		printUsage()
+	}
+
 	fetchTables()
-	switch command := args[0]; command {
+	switch command, cargs := args[0], args[1:]; command {
 	case "AddUser":
-		if len(args[1:]) != 2 {
+		if len(cargs) != 2 {
 			printUsage()
 		}
 		ret := addUser(args[1], args[2])
 		fmt.Println(ret)
-		cleanup_and_exit()
 	case "Authenticate":
-		if len(args[1:]) != 2 {
+		if len(cargs) != 2 {
 			printUsage()
 		}
 		ret := authenticate(args[1], args[2])
 		fmt.Println(ret)
-		cleanup_and_exit()
 	case "SetDomain":
-		if len(args[1:]) != 2 {
+		if len(cargs) != 2 {
 			printUsage()
 		}
 		ret := setDomain(args[1], args[2])
 		fmt.Println(ret)
-		cleanup_and_exit()
 	case "DomainInfo":
-		if len(args[1:]) != 1 {
+		if len(cargs) != 1 {
 			printUsage()
 		}
 		if args[1] == "" {
 			return
 		}
-		domainInfo(args[1])
-		cleanup_and_exit()
+		domainInfo(cargs)
 	case "SetType":
+		setType(cargs)
 	case "TypeInfo":
+		typeInfo(cargs)
 	case "AddAccess":
+		addAccess(cargs)
 	case "CanAccess":
+		canAccess(cargs)
 	default:
 		printUsage()
 	}
-	printUsage()
+	cleanup_and_exit()
 }
