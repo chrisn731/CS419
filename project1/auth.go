@@ -14,18 +14,32 @@ const (
 	typesFile = "./types.json"
 )
 
+// Represents the User in our authentication system.
 type User struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Domains []string
 }
 
+// Represents a permission granted to a domain to a type
+type Permission struct {
+	// The operation allowed on the type
+	Operation string
+
+	// The type allowed to be accessed.
+	Type string
+}
+
+// Represents the domains in our authentication system
 type Domain struct {
+	// A named reference to the users within the domain
 	Users []string
-	Operations []string
+
+	// Permissions that belong to this domain
+	Permissions []Permission
 }
 
-var domains2 = make(map[string]Domain)
-var domains = make(map[string][]string)
+var domains = make(map[string]Domain)
 var users []User = make([]User, 0)
 var types = make(map[string][]string)
 
@@ -110,17 +124,20 @@ func authenticate(username, pass string) string {
 func setDomain(user, dName string) string {
 	v, ok := domains[dName]
 	if !ok {
-		v = make([]string, 0)
+		v = Domain{}
 		domains[dName] = v
 	}
-	for _, elm := range v {
+	// Go over the domains users
+	for _, elm := range v.Users {
 		if elm == user {
 			return "Error: user exists"
 		}
 	}
-	for _, elm := range users {
+	// Update the user
+	for idx, elm := range users {
 		if elm.Username == user {
-			v = append(v, user)
+			v.Users = append(v.Users, user)
+			users[idx].Domains = append(users[idx].Domains, dName)
 			domains[dName] = v
 			return "Success"
 
@@ -148,7 +165,7 @@ func domainInfo(args []string) {
 	}
 
 	if v, ok := domains[dName]; ok {
-		for _, name := range v {
+		for _, name := range v.Users {
 			fmt.Println(name)
 		}
 	}
@@ -206,12 +223,82 @@ func typeInfo(args []string) {
 	}
 }
 
+// Defines access rights.
+// Domain name and type must NOT be non-empty strings
+// If the domain name OR type name does not exist, they will be created.
+// If the operation already exists for that domain and type, it will not
+// be added and silently fail.
 func addAccess(args []string) {
+	if len(args) > 3 {
+		fmt.Println("Error: too many arguments for AddAccess")
+	} else if len(args) < 3 {
+		fmt.Println("Error: too few arguments for AddAccess")
+	}
 
+	op, dName, tName := args[0], args[1], args[2]
+	if op == "" {
+		fmt.Println("Error: missing operation")
+		return
+	} else if dName == "" {
+		fmt.Println("Error missing domain")
+		return
+	} else if tName == "" {
+		fmt.Println("Error missing type")
+		return
+	}
+
+	domain, ok := domains[dName]
+	if !ok {
+		domains[dName] = Domain{}
+		domain = Domain{}
+	}
+	if _, ok := types[tName]; !ok {
+		types[tName] = make([]string, 0)
+	}
+	domain.Permissions = append(domain.Permissions,
+		Permission{
+			Operation: op,
+			Type: tName,
+		},
+	)
+	domains[dName] = domain
+	fmt.Println("Success")
 }
 
 func canAccess(args []string) {
+	if len(args) > 3 {
+		fmt.Println("Error: too many arguments for CanAccess")
+	} else if len(args) < 3 {
+		fmt.Println("Error: too few arguments for CanAccess")
+	}
 
+	var user User
+	op, userName, obj := args[0], args[1], args[2]
+
+	for _, u := range users {
+		if u.Username == userName {
+			user = u
+		}
+	}
+
+	for _, domain := range user.Domains {
+		dom, ok := domains[domain]
+		if !ok {
+			continue
+		}
+		fmt.Println(dom)
+		for _, perm := range dom.Permissions {
+			if perm.Operation != op {
+				continue
+			}
+			for _, o := range types[perm.Type] {
+				if obj == o {
+					fmt.Println("Success")
+					return
+				}
+			}
+		}
+	}
 }
 
 func cleanup_and_exit() {
