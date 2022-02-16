@@ -257,13 +257,25 @@ func addAccess(args []string) {
 	if _, ok := types[tName]; !ok {
 		types[tName] = make([]string, 0)
 	}
-	domain.Permissions = append(domain.Permissions,
-		Permission{
-			Operation: op,
-			Type: tName,
-		},
-	)
-	domains[dName] = domain
+
+	newPerm := true
+	for _, perm := range domain.Permissions {
+		if perm.Operation == op && perm.Type == tName {
+			// This access permission already exists, don't add it again
+			newPerm = false
+			break
+		}
+	}
+
+	if newPerm {
+		domain.Permissions = append(domain.Permissions,
+			Permission{
+				Operation: op,
+				Type: tName,
+			},
+		)
+		domains[dName] = domain
+	}
 	fmt.Println("Success")
 }
 
@@ -333,7 +345,7 @@ func main() {
 	case "CanAccess":
 		canAccess(cargs)
 	default:
-		die("Error: invalid command %s\n", command)
+		die("Error: invalid command %s", command)
 
 	}
 	cleanup_and_exit()
