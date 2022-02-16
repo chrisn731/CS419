@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"os"
-	"log"
-	"io/ioutil"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 )
 
 const (
@@ -39,16 +39,15 @@ type Domain struct {
 	Permissions []Permission
 }
 
-var domains = make(map[string]Domain)
-var users []User = make([]User, 0)
-var types = make(map[string][]string)
+var (
+	domains = make(map[string]Domain)
+	users []User = make([]User, 0)
+	types = make(map[string][]string)
+)
 
-func printUsage() {
-	fmt.Print("Usage: ./auth <command> [options...]\n",
-		"Commands:\n",
-		"  AddUser\n",
-		"  etc\n",
-	)
+func die(errm string, args ...interface{}) {
+	fmt.Printf(errm, args...)
+	fmt.Println("")
 	os.Exit(0)
 }
 
@@ -86,34 +85,48 @@ func fetchTables() {
 
 // Defines a new user with a password.
 // The username CANNOT be an empty string. The password CAN be an empty string.
-func addUser(username, pass string) string {
+func addUser(args []string) {
+	if len(args) > 2 {
+		die("Error: too many arguments for AddUser")
+	} else if len(args) < 2 {
+		die("Error: too few arguments for AddUser")
+	}
+
+	username, pass := args[0], args[1]
 	if username == "" {
-		return "Error: username missing"
+		die("Error: username missing")
 	}
 	for _, elm := range users {
 		if elm.Username == username {
-			return "Error: user exists"
+			die("Error: user exists")
 		}
 	}
 	users = append(users, User{
 		Username: username,
 		Password: pass,
 	})
-	sync()
-	return "Success"
+	fmt.Println("Success")
 }
 
 // Validates a user's password by username and password.
-func authenticate(username, pass string) string {
+func authenticate(args []string) {
+	if len(args) > 2 {
+		die("Error: too many arguments for Authenticate")
+	} else if len(args) < 2 {
+		die("Error: too few arguments for Authenticate")
+	}
+
+	username, pass := args[0], args[1]
 	for _, elm := range users {
 		if elm.Username == username {
 			if elm.Password == pass {
-				return "Success"
+				fmt.Println("Success")
+				return
 			}
-			return "Error: bad password"
+			die("Error: bad password")
 		}
 	}
-	return "Error: no such user"
+	die("Error: no such user")
 }
 
 // Assign a user to a domain.
@@ -121,7 +134,14 @@ func authenticate(username, pass string) string {
 // If a user does not exist, this function will return an error.
 // A user may belong to multiple domains, but domains can not have duplicates.
 // The domain name must be a non-empty string.
-func setDomain(user, dName string) string {
+func setDomain(args []string) {
+	if len(args) > 2 {
+		die("Error: too many arguments for SetDomain")
+	} else if len(args) < 2 {
+		die("Error: too few arguments for SetDomain")
+	}
+
+	user, dName := args[0], args[1]
 	v, ok := domains[dName]
 	if !ok {
 		v = Domain{}
@@ -130,7 +150,7 @@ func setDomain(user, dName string) string {
 	// Go over the domains users
 	for _, elm := range v.Users {
 		if elm == user {
-			return "Error: user exists"
+			die("Error: user exists")
 		}
 	}
 	// Update the user
@@ -139,11 +159,12 @@ func setDomain(user, dName string) string {
 			v.Users = append(v.Users, user)
 			users[idx].Domains = append(users[idx].Domains, dName)
 			domains[dName] = v
-			return "Success"
+			fmt.Println("Success")
+			return
 
 		}
 	}
-	return "Error: no such user"
+	die("Error: no such user")
 }
 
 // List all the users within a domain.
@@ -152,18 +173,12 @@ func setDomain(user, dName string) string {
 // The passed in domain name must NOT be empty.
 func domainInfo(args []string) {
 	if len(args) > 1 {
-		fmt.Println("Error: too many arguments for DomainInfo")
-		return
+		die("Error: too many arguments for DomainInfo")
 	} else if len(args) < 1 {
-		fmt.Println("Error: too few arguments for DomainInfo")
-		return
+		die("Error: too few arguments for DomainInfo")
 	}
 
 	dName := args[0]
-	if dName == "" {
-		fmt.Println("Error missing name of domain")
-	}
-
 	if v, ok := domains[dName]; ok {
 		for _, name := range v.Users {
 			fmt.Println(name)
@@ -173,20 +188,16 @@ func domainInfo(args []string) {
 
 func setType(args []string) {
 	if len(args) < 2 {
-		fmt.Println("Error: not enough arguments to SetType!")
-		return
+		die("Error: not enough arguments to SetType!")
 	} else if len(args) > 2 {
-		fmt.Println("Error: too many arguments to SetType!")
-		return
+		die("Error: too many arguments to SetType!")
 	}
 
 	objName, typeName := args[0], args[1]
 	if objName == "" {
-		fmt.Println("Error: objectname is empty")
-		return
+		die("Error: objectname is empty")
 	} else if typeName == "" {
-		fmt.Println("Error: type is empty")
-		return
+		die("Error: type is empty")
 	}
 
 	objs, ok := types[typeName]
@@ -200,26 +211,20 @@ func setType(args []string) {
 
 func typeInfo(args []string) {
 	if len(args) > 1 {
-		fmt.Println("Error: too many arguments for TypeInfo")
-		return
+		die("Error: too many arguments for TypeInfo")
 	} else if len(args) < 1 {
-		fmt.Println("Error: not enough arguments for TypeInfo")
-		return
+		die("Error: not enough arguments for TypeInfo")
 	}
 
 	typeName := args[0]
 	if typeName == "" {
-		fmt.Println("Error: type is empty")
-		return
+		die("Error: type is empty")
 	}
 
-	objs, ok := types[typeName]
-	if !ok || len(objs) == 0 {
-		return
-	}
-
-	for _, obj := range objs {
-		fmt.Println(obj)
+	if objs, ok := types[typeName]; ok {
+		for _, obj := range objs {
+			fmt.Println(obj)
+		}
 	}
 }
 
@@ -230,21 +235,18 @@ func typeInfo(args []string) {
 // be added and silently fail.
 func addAccess(args []string) {
 	if len(args) > 3 {
-		fmt.Println("Error: too many arguments for AddAccess")
+		die("Error: too many arguments for AddAccess")
 	} else if len(args) < 3 {
-		fmt.Println("Error: too few arguments for AddAccess")
+		die("Error: too few arguments for AddAccess")
 	}
 
 	op, dName, tName := args[0], args[1], args[2]
 	if op == "" {
-		fmt.Println("Error: missing operation")
-		return
+		die("Error: missing operation")
 	} else if dName == "" {
-		fmt.Println("Error missing domain")
-		return
+		die("Error missing domain")
 	} else if tName == "" {
-		fmt.Println("Error missing type")
-		return
+		die("Error missing type")
 	}
 
 	domain, ok := domains[dName]
@@ -267,9 +269,9 @@ func addAccess(args []string) {
 
 func canAccess(args []string) {
 	if len(args) > 3 {
-		fmt.Println("Error: too many arguments for CanAccess")
+		die("Error: too many arguments for CanAccess")
 	} else if len(args) < 3 {
-		fmt.Println("Error: too few arguments for CanAccess")
+		die("Error: too few arguments for CanAccess")
 	}
 
 	var user User
@@ -286,7 +288,6 @@ func canAccess(args []string) {
 		if !ok {
 			continue
 		}
-		fmt.Println(dom)
 		for _, perm := range dom.Permissions {
 			if perm.Operation != op {
 				continue
@@ -299,6 +300,7 @@ func canAccess(args []string) {
 			}
 		}
 	}
+	die("Error: access denied")
 }
 
 func cleanup_and_exit() {
@@ -308,38 +310,19 @@ func cleanup_and_exit() {
 
 func main() {
 	args := os.Args[1:]
-
 	if len(args) == 0 {
-		printUsage()
+		die("Error: no command given")
 	}
 
 	fetchTables()
 	switch command, cargs := args[0], args[1:]; command {
 	case "AddUser":
-		if len(cargs) != 2 {
-			printUsage()
-		}
-		ret := addUser(args[1], args[2])
-		fmt.Println(ret)
+		addUser(cargs)
 	case "Authenticate":
-		if len(cargs) != 2 {
-			printUsage()
-		}
-		ret := authenticate(args[1], args[2])
-		fmt.Println(ret)
+		authenticate(cargs)
 	case "SetDomain":
-		if len(cargs) != 2 {
-			printUsage()
-		}
-		ret := setDomain(args[1], args[2])
-		fmt.Println(ret)
+		setDomain(cargs)
 	case "DomainInfo":
-		if len(cargs) != 1 {
-			printUsage()
-		}
-		if args[1] == "" {
-			return
-		}
 		domainInfo(cargs)
 	case "SetType":
 		setType(cargs)
@@ -350,7 +333,8 @@ func main() {
 	case "CanAccess":
 		canAccess(cargs)
 	default:
-		printUsage()
+		die("Error: invalid command %s\n", command)
+
 	}
 	cleanup_and_exit()
 }
