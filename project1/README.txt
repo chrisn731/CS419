@@ -15,7 +15,8 @@ Notes
 This program does not rely on any non standard Go libraries.
 
 Tables that contain important user, domain, and type information are all
-generated when they are not detected within the current directory.
+generated when they are not detected within the current directory. Therefore,
+no user action is needed to set up the tables.
 
 
 Tests Used

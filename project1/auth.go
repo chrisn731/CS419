@@ -89,7 +89,7 @@ func addUser(args []string) {
 	if len(args) > 2 {
 		die("Error: too many arguments for AddUser")
 	} else if len(args) < 2 {
-		die("Error: too few arguments for AddUser")
+		die("Error: missing operands for AddUser")
 	}
 
 	username, pass := args[0], args[1]
@@ -113,7 +113,7 @@ func authenticate(args []string) {
 	if len(args) > 2 {
 		die("Error: too many arguments for Authenticate")
 	} else if len(args) < 2 {
-		die("Error: too few arguments for Authenticate")
+		die("Error: missing operands for Authenticate")
 	}
 
 	username, pass := args[0], args[1]
@@ -138,10 +138,14 @@ func setDomain(args []string) {
 	if len(args) > 2 {
 		die("Error: too many arguments for SetDomain")
 	} else if len(args) < 2 {
-		die("Error: too few arguments for SetDomain")
+		die("Error: missing operands for SetDomain")
 	}
 
 	user, dName := args[0], args[1]
+	if dName == "" {
+		die("Error: missing domain")
+	}
+
 	v, ok := domains[dName]
 	if !ok {
 		v = Domain{}
@@ -175,10 +179,14 @@ func domainInfo(args []string) {
 	if len(args) > 1 {
 		die("Error: too many arguments for DomainInfo")
 	} else if len(args) < 1 {
-		die("Error: too few arguments for DomainInfo")
+		die("Error: missing operands for DomainInfo")
 	}
 
 	dName := args[0]
+	if dName == "" {
+		die("Error: missing domain")
+	}
+
 	if v, ok := domains[dName]; ok {
 		for _, name := range v.Users {
 			fmt.Println(name)
@@ -204,8 +212,17 @@ func setType(args []string) {
 	if !ok {
 		objs = make([]string, 0)
 	}
-	objs = append(objs, objName)
-	types[typeName] = objs
+	newObj := true
+	for _, obj := range objs {
+		if obj == objName {
+			newObj = false
+			break
+		}
+	}
+	if newObj {
+		objs = append(objs, objName)
+		types[typeName] = objs
+	}
 	fmt.Println("Success")
 }
 
@@ -237,7 +254,7 @@ func addAccess(args []string) {
 	if len(args) > 3 {
 		die("Error: too many arguments for AddAccess")
 	} else if len(args) < 3 {
-		die("Error: too few arguments for AddAccess")
+		die("Error: missing operands for AddAccess")
 	}
 
 	op, dName, tName := args[0], args[1], args[2]
@@ -279,11 +296,15 @@ func addAccess(args []string) {
 	fmt.Println("Success")
 }
 
+// Test whether a user can perform an operation on an object
+// args[0]: Operation
+// arsg[1]: Username
+// args[2]: Object
 func canAccess(args []string) {
 	if len(args) > 3 {
 		die("Error: too many arguments for CanAccess")
 	} else if len(args) < 3 {
-		die("Error: too few arguments for CanAccess")
+		die("Error: missing operands for CanAccess")
 	}
 
 	var user User
@@ -315,11 +336,6 @@ func canAccess(args []string) {
 	die("Error: access denied")
 }
 
-func cleanup_and_exit() {
-	sync()
-	os.Exit(0)
-}
-
 func main() {
 	args := os.Args[1:]
 	if len(args) == 0 {
@@ -348,5 +364,6 @@ func main() {
 		die("Error: invalid command %s", command)
 
 	}
-	cleanup_and_exit()
+	sync()
+	os.Exit(0)
 }
