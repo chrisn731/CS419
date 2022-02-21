@@ -1,5 +1,4 @@
-
-all:
+auth: auth.go
 	go build auth.go
 
 cleantables:

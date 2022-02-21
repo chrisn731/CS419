@@ -8,6 +8,7 @@ import (
 	"os"
 )
 
+// Paths to use for files
 const (
 	usersFile = "./users.json"
 	domainsFile = "./domains.json"
@@ -39,18 +40,21 @@ type Domain struct {
 	Permissions []Permission
 }
 
+// Data structures to hold our authentication buisness
 var (
 	domains = make(map[string]Domain)
 	users []User = make([]User, 0)
 	types = make(map[string][]string)
 )
 
+// Error happened during runtime. Print out a message and exit.
 func die(errm string, args ...interface{}) {
 	fmt.Printf(errm, args...)
 	fmt.Println("")
 	os.Exit(0)
 }
 
+// Save our authentication data structures to disk.
 func sync() {
 	syncContainer := func(file string, container interface{}) {
 		bytes, err := json.MarshalIndent(container, "", " ")
@@ -64,6 +68,8 @@ func sync() {
 	syncContainer(typesFile, types)
 }
 
+// Fetch the files containing the data for our authentication.
+// Load the data into the relevant data structures.
 func fetchTables() {
 	fetch := func(file string, container interface{}) {
 		if _, err := os.Stat(file); err != nil {
@@ -194,6 +200,9 @@ func domainInfo(args []string) {
 	}
 }
 
+// Assigns a type to an object.
+// If the type does not exist, it is created.
+// Object can be any non-null string
 func setType(args []string) {
 	if len(args) < 2 {
 		die("Error: not enough arguments to SetType!")
@@ -203,9 +212,9 @@ func setType(args []string) {
 
 	objName, typeName := args[0], args[1]
 	if objName == "" {
-		die("Error: objectname is empty")
+		die("Error: missing object")
 	} else if typeName == "" {
-		die("Error: type is empty")
+		die("Error: missing type")
 	}
 
 	objs, ok := types[typeName]
@@ -226,6 +235,8 @@ func setType(args []string) {
 	fmt.Println("Success")
 }
 
+// Lists all the objects of a specific type
+// Type name must be non-empty
 func typeInfo(args []string) {
 	if len(args) > 1 {
 		die("Error: too many arguments for TypeInfo")
@@ -235,7 +246,7 @@ func typeInfo(args []string) {
 
 	typeName := args[0]
 	if typeName == "" {
-		die("Error: type is empty")
+		die("Error: missing type")
 	}
 
 	if objs, ok := types[typeName]; ok {
@@ -339,7 +350,7 @@ func canAccess(args []string) {
 func main() {
 	args := os.Args[1:]
 	if len(args) == 0 {
-		die("Error: no command given")
+		die("Error: missing command")
 	}
 
 	fetchTables()
