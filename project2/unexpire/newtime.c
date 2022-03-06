@@ -28,7 +28,7 @@ time_t time(time_t *t)
 		struct tm tm;
 
 		if (!strptime(DATE_TO_USE, "%m-%d-%Y %H:%M:%S", &tm))
-			err(1, "newtime: strptime() fail at line (%lu)", __LINE__);
+			err(1, "newtime: strptime() fail at line (%d)", __LINE__);
 		ret = mktime(&tm);
 		if (ret == (time_t) -1)
 			err(1, "Failed to mktime()");
@@ -38,7 +38,7 @@ time_t time(time_t *t)
 	} else {
 		time_t (*real_time)(time_t *) = dlsym(RTLD_NEXT, "time");
 		if (!real_time)
-			err(1, "dlsym fail(). Could not get original time()");
+			err(1, "dlsym fail(). Could not get original time");
 		ret = real_time(t);
 	}
 	return ret;
