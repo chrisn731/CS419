@@ -10,8 +10,6 @@ const (
 	increment = 12345
 )
 
-func unused(x interface{}) { }
-
 func readFile(fname string) []byte {
 	dat, err := os.ReadFile(fname)
 	if err != nil {

@@ -1,10 +1,9 @@
-
 all: encrypt decrypt
 
-encrypt: vencrypt.go
+encrypt: sbencrypt.go
 	go build $^
 
-decrypt: vdecrypt.go
+decrypt: sbdecrypt.go
 	go build $^
 
 clean:
