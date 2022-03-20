@@ -1,21 +1,21 @@
 package main
 
 import (
-	"os"
 	"fmt"
+	"os"
 )
 
 const (
 	// Constants for the keystream generator
 	multiplier = 1103515245
-	increment = 12345
+	increment  = 12345
 
 	// The blocksize of the cipher
-	blockSize = 16
+	blockSize  = 16
 )
 
 var (
-	_seed uint64 = 0
+	seed uint64 = 0
 )
 
 func readFile(fname string) []byte {
@@ -36,17 +36,17 @@ func sdbm(str []byte) (hash uint64) {
 	return
 }
 
-func linearCongruentGen(seed uint64) byte {
-	return byte((multiplier * seed + increment) % 256)
+func linearCongruentGen() byte {
+	ret := byte((multiplier * seed + increment) % 256)
+	seed = uint64(ret)
+	return ret
 }
 
 func genBlockKeyStream() [blockSize]byte {
 	var gen [blockSize]byte
 
 	for i := 0; i < blockSize; i++ {
-		ret := linearCongruentGen(_seed)
-		_seed = uint64(ret)
-		gen[i] = ret
+		gen[i] = linearCongruentGen()
 	}
 	return gen
 }
@@ -55,18 +55,20 @@ func shuffleBytes(plaintext, keystream []byte) {
 	for i := blockSize - 1; i >= 0; i-- {
 		first := keystream[i] & 0x0f
 		second := (keystream[i] >> 4) & 0x0f
-		temp := plaintext[first]
-		plaintext[first] = plaintext[second]
-		plaintext[second] = temp
+		plaintext[first], plaintext[second] = plaintext[second], plaintext[first]
 	}
+}
 
+func seedGenerator(password []byte) {
+	seed = sdbm(password)
 }
 
 func doDecryption(ciphertext []byte) []byte {
 	var plaintext, prevCipher []byte
 
 	iv := genBlockKeyStream()
-	isFirst := true
+	// On our first iteration use the initialization vector
+	prevCipher = iv[:]
 	for len(ciphertext) != 0 {
 		var tempBlock [blockSize]byte
 
@@ -79,12 +81,6 @@ func doDecryption(ciphertext []byte) []byte {
 		// Shuffle the bytes
 		shuffleBytes(tempBlock[:], keystream[:])
 
-		// XOR our (almost) plaintext with previous block of cipher text.
-		// If this is the first iteration, use the initialization vector
-		if isFirst {
-			prevCipher = iv[:]
-			isFirst = false
-		}
 		for i := 0; i < blockSize; i++ {
 			tempBlock[i] ^= prevCipher[i]
 		}
@@ -108,7 +104,7 @@ func main() {
 
 	// Initalize the keystream generator seed
 	password := []byte(args[0])
-	_seed = sdbm(password)
+	seedGenerator(password)
 
 	ciphertext := readFile(args[1])
 	outFile := args[2]

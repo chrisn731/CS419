@@ -22,10 +22,11 @@ func doDecrypt(key, ciphertext []byte) (plaintext []byte) {
 }
 
 func main() {
+	program := os.Args[0]
 	args := os.Args[1:]
 	if len(args) != 3 {
-		fmt.Println("Bad usage")
-		os.Exit(0)
+		fmt.Printf("Usage: %s password plaintext ciphertext\n", program)
+		os.Exit(1)
 	}
 
 	key := readFile(args[0])

@@ -36,10 +36,11 @@ func doEncrypt(key, plaintext []byte, cipher [256][256]uint8) (ciphertext []byte
 func main() {
 	var cipherGrid [256][256]uint8
 
+	program := os.Args[0]
 	args := os.Args[1:]
 	if len(args) != 3 {
-		fmt.Println("Bad usage")
-		os.Exit(0)
+		fmt.Printf("Usage: %s password plaintext ciphertext\n", program)
+		os.Exit(1)
 	}
 
 	fillCipherGrid(cipherGrid[:])

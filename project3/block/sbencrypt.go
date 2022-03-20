@@ -1,22 +1,21 @@
 package main
 
 import (
-	"os"
 	"fmt"
+	"os"
 )
-
 
 const (
 	// Constants for the keystream generator
 	multiplier = 1103515245
-	increment = 12345
+	increment  = 12345
 
 	// The blocksize of the cipher
-	blockSize = 16
+	blockSize  = 16
 )
 
 var (
-	_seed uint64 = 0
+	seed uint64 = 0
 )
 
 func readFile(fname string) []byte {
@@ -37,15 +36,15 @@ func sdbm(str []byte) (hash uint64) {
 	return
 }
 
-func linearCongruentGen(seed uint64) byte {
-	return byte((multiplier * seed + increment) % 256)
+func linearCongruentGen() byte {
+	ret := byte((multiplier * seed + increment) % 256)
+	seed = uint64(ret)
+	return ret
 }
 
 func genBlockKeyStream() (keyGen [blockSize]byte) {
 	for i := 0; i < blockSize; i++ {
-		ret := linearCongruentGen(_seed)
-		_seed = uint64(ret)
-		keyGen[i] = ret
+		keyGen[i] = linearCongruentGen()
 	}
 	return
 }
@@ -54,11 +53,12 @@ func shuffleBytes(plaintext, keystream []byte) {
 	for i := 0; i < blockSize; i++ {
 		first := keystream[i] & 0x0f
 		second := (keystream[i] >> 4) & 0x0f
-		temp := plaintext[first]
-		plaintext[first] = plaintext[second]
-		plaintext[second] = temp
+		plaintext[first], plaintext[second] = plaintext[second], plaintext[first]
 	}
+}
 
+func seedGenerator(password []byte) {
+	seed = sdbm(password)
 }
 
 func doEncryption(plaintext []byte) []byte {
@@ -72,15 +72,10 @@ func doEncryption(plaintext []byte) []byte {
 	}
 
 	iv := genBlockKeyStream()
-	isFirst := true
+	// On our first iteration we should use our initalization vector
+	prevCipher = iv
 	for len(plaintext) != 0 {
 		var tempBlock [blockSize]byte
-
-		// If this is the first iteration, we use our initalization vector
-		if isFirst {
-			prevCipher = iv
-			isFirst = false
-		}
 
 		// Apply CBC
 		for i := 0; i < blockSize; i++ {
@@ -116,7 +111,7 @@ func main() {
 
 	// Initalize the keystream generator seed
 	password := []byte(args[0])
-	_seed = sdbm(password)
+	seedGenerator(password)
 
 	plaintext := readFile(args[1])
 	outFile := args[2]

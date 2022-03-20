@@ -7,7 +7,11 @@ import (
 
 const (
 	multiplier = 1103515245
-	increment = 12345
+	increment  = 12345
+)
+
+var (
+	seed uint64 = 0
 )
 
 func readFile(fname string) []byte {
@@ -19,43 +23,49 @@ func readFile(fname string) []byte {
 	return dat
 }
 
-func linearCongruentGen(seed uint64) byte {
-	return byte((multiplier * seed + increment) % 256)
+func linearCongruentGen() byte {
+	ret := byte((multiplier * seed + increment) % 256)
+	seed = uint64(ret)
+	return ret
 }
 
 func sdbm(str []byte) (hash uint64) {
-	for i := 0; i < len(str); i++ {
-		c := uint64(str[i])
+	for _, b := range str {
+		c := uint64(b)
 		hash = c + (hash << 6) + (hash << 16) - hash
 	}
 	return
 }
 
 func doStreamCipher(password, text []byte, outfile string) {
-	file, err := os.Create(outfile)
+	var fullResult []byte
+	for _, b := range text {
+		fullResult = append(fullResult, b ^ linearCongruentGen())
+	}
+	err := os.WriteFile(outfile, fullResult, 0644)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	defer file.Close()
+}
 
-	seed := sdbm([]byte(password))
-	for i := 0; i < len(text); i++ {
-		stream := linearCongruentGen(seed)
-		result := text[i] ^ stream
-		file.Write([]byte{result})
-		seed = uint64(stream)
-	}
+func seedGenerator(password []byte) {
+	seed = sdbm(password)
 }
 
 func main() {
+	program := os.Args[0]
 	args := os.Args[1:]
-
 	if len(args) != 3 {
-		fmt.Println("Usage: scrypt password ...")
+		fmt.Printf("Usage: %s password plaintext ciphertext\n" +
+				"\tor\n" +
+				"Usage: %s password ciphertext plaintext\n",
+				program, program)
 		os.Exit(1)
 	}
-	password := args[0]
+
+	password := []byte(args[0])
+	seedGenerator(password)
 	in := readFile(args[1])
 	outFile := args[2]
 	doStreamCipher([]byte(password), in, outFile)
