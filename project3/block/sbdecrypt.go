@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -17,15 +18,6 @@ const (
 var (
 	seed uint64 = 0
 )
-
-func readFile(fname string) []byte {
-	dat, err := os.ReadFile(fname)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-	return dat
-}
 
 // Seed function
 func sdbm(str []byte) (hash uint64) {
@@ -63,35 +55,77 @@ func seedGenerator(password []byte) {
 	seed = sdbm(password)
 }
 
-func doDecryption(ciphertext []byte) []byte {
-	var plaintext, prevCipher []byte
+func decryptBlock(ciphertext, prevCipher []byte) [blockSize]byte {
+	var tempBlock [blockSize]byte
 
-	iv := genBlockKeyStream()
-	// On our first iteration use the initialization vector
-	prevCipher = iv[:]
-	for len(ciphertext) != 0 {
-		var tempBlock [blockSize]byte
-
-		// XOR ciphertext with generated keystream
-		keystream := genBlockKeyStream()
-		for i := 0; i < blockSize; i++ {
-			tempBlock[i] = ciphertext[i] ^ keystream[i]
-		}
-
-		// Shuffle the bytes
-		shuffleBytes(tempBlock[:], keystream[:])
-
-		for i := 0; i < blockSize; i++ {
-			tempBlock[i] ^= prevCipher[i]
-		}
-		prevCipher = ciphertext[:blockSize]
-		ciphertext = ciphertext[blockSize:]
-		plaintext = append(plaintext, tempBlock[:]...)
+	// XOR ciphertext with generated keystream
+	keystream := genBlockKeyStream()
+	for i := 0; i < blockSize; i++ {
+		tempBlock[i] = ciphertext[i] ^ keystream[i]
 	}
-	// Strip off the padding
-	paddingSize := int(plaintext[len(plaintext) - 1])
-	plaintext = plaintext[:len(plaintext) - paddingSize]
-	return plaintext
+
+	// Shuffle the bytes
+	shuffleBytes(tempBlock[:], keystream[:])
+
+	for i := 0; i < blockSize; i++ {
+		tempBlock[i] ^= prevCipher[i]
+	}
+	return tempBlock
+}
+
+func doDecryption(i, o string) error {
+	in, err := os.Open(i)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(o, os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
+	// Need to keep track of how many bytes left for padding
+	sizeLeft := info.Size()
+
+	buf := make([]byte, 4096)
+	iv := genBlockKeyStream()
+	prevCipher := iv[:]
+	for sizeLeft > 0 {
+		var plaintext []byte
+		n, err := in.Read(buf)
+		if err != nil && err != io.EOF {
+			return err
+		}
+
+		sizeLeft -= int64(n)
+		for i := 0; i < n; i += blockSize {
+			start := i
+			end := i + blockSize
+			ptxt := decryptBlock(buf[start:end], prevCipher)
+			plaintext = append(plaintext, ptxt[:]...)
+			prevCipher = buf[start:end]
+		}
+		// Need to hold a copy of the last block of ciphertext for next iteration
+		prevCipher = make([]byte, blockSize)
+		copy(prevCipher, buf[n - blockSize:n])
+
+		// Remove padding
+		if sizeLeft <= 0 {
+			numBytesPadded := int(plaintext[n - 1])
+			plaintext = plaintext[:len(plaintext) - numBytesPadded]
+		}
+		_, err = out.Write(plaintext)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
@@ -105,14 +139,7 @@ func main() {
 	// Initalize the keystream generator seed
 	password := []byte(args[0])
 	seedGenerator(password)
-
-	ciphertext := readFile(args[1])
-	outFile := args[2]
-
-	ret := doDecryption(ciphertext)
-	err := os.WriteFile(outFile, ret, 0644)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+	if err := doDecryption(args[1], args[2]); err != nil {
+		panic(err)
 	}
 }

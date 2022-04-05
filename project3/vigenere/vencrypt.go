@@ -2,19 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
-
-func fillCipherGrid(grid [][256]uint8) {
-	for i := 0; i < len(grid); i++ {
-		for j := 0; j < len(grid[i]) - i; j++ {
-			grid[i][j] = uint8(i + j)
-		}
-		for j := len(grid[i]) - i; j < len(grid[i]); j++ {
-			grid[i][j] = uint8(j - (len(grid[i]) - i))
-		}
-	}
-}
 
 func readFile(fname string) []byte {
 	dat, err := os.ReadFile(fname)
@@ -25,36 +15,55 @@ func readFile(fname string) []byte {
 	return dat
 }
 
-func doEncrypt(key, plaintext []byte, cipher [256][256]uint8) (ciphertext []byte) {
-	for i := 0; i < len(plaintext); i++ {
-		ciphertext = append(ciphertext,
-				byte(cipher[plaintext[i] % 255][key[i] % 255]))
+func doEncrypt(key []byte, ptxt, ctxt string) error {
+	f, err := os.Open(ptxt)
+	if err != nil {
+		return err
 	}
-	return
+	defer f.Close()
+
+	cf, err := os.OpenFile(ctxt, os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer cf.Close()
+
+	buf := make([]byte, 4096)
+	var nr uint64
+	for {
+		n, err := f.Read(buf)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		if n == 0 {
+			break
+		}
+
+		for i := 0; i < n; i++ {
+			// C[i] = (M[i] + K[i % len(K)]) % len(alphabet)
+			keylen := uint64(len(key))
+			buf[i] = byte((int(buf[i]) + int(key[nr % keylen])) % 256)
+			nr++
+		}
+		n, err = cf.Write(buf[:n])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
-	var cipherGrid [256][256]uint8
-
 	program := os.Args[0]
 	args := os.Args[1:]
 	if len(args) != 3 {
-		fmt.Printf("Usage: %s password plaintext ciphertext\n", program)
+		fmt.Printf("Usage: %s keyfile plaintext ciphertext\n", program)
 		os.Exit(1)
 	}
 
-	fillCipherGrid(cipherGrid[:])
 	key := readFile(args[0])
-	plaintext := readFile(args[1])
-	for len(key) < len(plaintext) {
-		key = append(key, key...)
-	}
-	output := args[2]
-	//fmt.Printf("Performing encrypt using key (%s) and plaintext (%s)\n",
-			//string(key), string(plaintext))
-	err := os.WriteFile(output, doEncrypt(key, plaintext, cipherGrid), 0644)
+	err := doEncrypt(key, args[1], args[2])
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		panic(err)
 	}
 }

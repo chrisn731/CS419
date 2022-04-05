@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -100,6 +101,76 @@ func doEncryption(plaintext []byte) []byte {
 	return completeCipher
 }
 
+func doEncryption1(i, o string) error {
+	in, err := os.Open(i)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(o, os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
+	sizeLeft := info.Size()
+
+	buf := make([]byte, 4096)
+	iv := genBlockKeyStream()
+	prevCipher := iv[:]
+	for sizeLeft > 0 {
+		var ciphertext []byte
+		n, err := in.Read(buf)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		sizeLeft -= int64(n)
+		if sizeLeft <= 0 {
+			numBytesToPad := blockSize - (n % blockSize)
+			for i := 0; i < numBytesToPad; i++ {
+				buf[n + i] = byte(numBytesToPad)
+			}
+			n += numBytesToPad
+		}
+
+		for i := 0; i < n; i += blockSize {
+			start := i
+			end := i + blockSize
+			prevCipher = encryptBlock(buf[start:end], prevCipher)
+			ciphertext = append(ciphertext, prevCipher...)
+		}
+		_, err = out.Write(ciphertext)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func encryptBlock(plaintext, prevCipher []byte) []byte {
+	var tempBlock [blockSize]byte
+
+	// Apply CBC
+	for i := 0; i < blockSize; i++ {
+		tempBlock[i] = plaintext[i] ^ prevCipher[i]
+	}
+	// Read 16 bytes from the keystream
+	keystream := genBlockKeyStream()
+
+	// Shuffle the bytes based on keystream data
+	shuffleBytes(tempBlock[:], keystream[:])
+
+	// XOR between CBC'd block and the keystream
+	for i := 0; i < blockSize; i++ {
+		prevCipher[i] = tempBlock[i] ^ keystream[i]
+	}
+	return prevCipher
+}
 
 func main() {
 	program := os.Args[0]
@@ -113,6 +184,11 @@ func main() {
 	password := []byte(args[0])
 	seedGenerator(password)
 
+	err := doEncryption1(args[1], args[2])
+	if err != nil {
+		panic(err)
+	}
+	/*
 	plaintext := readFile(args[1])
 	outFile := args[2]
 
@@ -122,4 +198,5 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
+	*/
 }
