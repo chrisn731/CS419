@@ -73,7 +73,7 @@ func main() {
 	if len(args) != 3 {
 		fmt.Printf("Usage: %s password plaintext ciphertext\n" +
 				"\tor\n" +
-				"Usage: %s password ciphertext plaintext\n",
+				"       %s password ciphertext plaintext\n",
 				program, program)
 		os.Exit(1)
 	}

@@ -43,6 +43,10 @@ func linearCongruentGen() byte {
 	return ret
 }
 
+func seedGenerator(password []byte) {
+	seed = sdbm(password)
+}
+
 func genBlockKeyStream() (keyGen [blockSize]byte) {
 	for i := 0; i < blockSize; i++ {
 		keyGen[i] = linearCongruentGen()
@@ -58,50 +62,7 @@ func shuffleBytes(plaintext, keystream []byte) {
 	}
 }
 
-func seedGenerator(password []byte) {
-	seed = sdbm(password)
-}
-
-func doEncryption(plaintext []byte) []byte {
-	var completeCipher []byte
-	var prevCipher [blockSize]byte
-
-	// Add padding where needed
-	numBytesToPad := blockSize - (len(plaintext) % blockSize)
-	for i := 0; i < numBytesToPad; i++ {
-		plaintext = append(plaintext, byte(numBytesToPad))
-	}
-
-	iv := genBlockKeyStream()
-	// On our first iteration we should use our initalization vector
-	prevCipher = iv
-	for len(plaintext) != 0 {
-		var tempBlock [blockSize]byte
-
-		// Apply CBC
-		for i := 0; i < blockSize; i++ {
-			tempBlock[i] = plaintext[i] ^ prevCipher[i]
-		}
-		// Read 16 bytes from the keystream
-		keystream := genBlockKeyStream()
-
-		// Shuffle the bytes based on keystream data
-		shuffleBytes(tempBlock[:], keystream[:])
-
-		// XOR between CBC'd block and the keystream
-		for i := 0; i < blockSize; i++ {
-			prevCipher[i] = tempBlock[i] ^ keystream[i]
-		}
-		// Add our ciphered block onto the rest
-		completeCipher = append(completeCipher, prevCipher[:]...)
-
-		// Advance the plaintext forward
-		plaintext = plaintext[blockSize:]
-	}
-	return completeCipher
-}
-
-func doEncryption1(i, o string) error {
+func doEncryption(i, o string) error {
 	in, err := os.Open(i)
 	if err != nil {
 		return err
@@ -184,19 +145,8 @@ func main() {
 	password := []byte(args[0])
 	seedGenerator(password)
 
-	err := doEncryption1(args[1], args[2])
+	err := doEncryption(args[1], args[2])
 	if err != nil {
 		panic(err)
 	}
-	/*
-	plaintext := readFile(args[1])
-	outFile := args[2]
-
-	ret := doEncryption(plaintext)
-	err := os.WriteFile(outFile, ret, 0644)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-	*/
 }
