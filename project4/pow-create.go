@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+const (
+	// The amount of iterations to limit our search to
+	searchLimit = 1000000000
+)
+
 func readFile(fname string) []byte {
 	dat, err := ioutil.ReadFile(fname)
 	if err != nil {
@@ -24,22 +29,10 @@ func numLeadingZeros(hash []rune) int {
 	// By looking at each character in the string, we can map a number
 	// of leading zeros to a rune
 	leadingZeros := map[rune]int{
-		'0': 4,
-		'1': 3,
-		'2': 2,
-		'3': 2,
-		'4': 1,
-		'5': 1,
-		'6': 1,
-		'7': 1,
-		'8': 0,
-		'9': 0,
-		'a': 0,
-		'b': 0,
-		'c': 0,
-		'd': 0,
-		'e': 0,
-		'f': 0,
+		'0': 4, '1': 3, '2': 2, '3': 2,
+		'4': 1, '5': 1, '6': 1, '7': 1,
+		'8': 0, '9': 0, 'a': 0, 'b': 0,
+		'c': 0, 'd': 0, 'e': 0, 'f': 0,
 	}
 	num := 0
 	for _, r := range hash {
@@ -61,7 +54,7 @@ func applySHA256(hash []rune) []rune {
 	return []rune(ret)
 }
 
-func generateProofOfWork(_hash string, nbits int) (work, newHash []rune, runs uint) {
+func generateProofOfWork(_hash string, nbits int) (work, newHash []rune, runs uint64) {
 	hash := []rune(_hash)
 	newHash = append(newHash, hash...)
 	if numLeadingZeros(newHash) == nbits {
@@ -74,6 +67,12 @@ func generateProofOfWork(_hash string, nbits int) (work, newHash []rune, runs ui
 	curridx := startidx
 	for numLeadingZeros(applySHA256(newHash)) < nbits {
 		runs++
+		if runs >= searchLimit {
+			fmt.Printf("Failed to find proof of work in %d runs" +
+					" increase search limit to continue " +
+					" for longer.", runs)
+			os.Exit(1)
+		}
 		// If we are out of bounds...
 		if newHash[curridx] >= 127 {
 			// check the closest variable we can still edit without
@@ -104,7 +103,14 @@ func generateProofOfWork(_hash string, nbits int) (work, newHash []rune, runs ui
 			curridx = len(newHash) - 1
 		} else {
 			// We are not out of the valid byte range, simply increment
-			newHash[curridx]++
+			// to the next valid character
+			for {
+				newHash[curridx]++
+				currval := newHash[curridx]
+				if currval != '\'' && currval != '"' {
+					break
+				}
+			}
 		}
 	}
 	// Pull out the work we did

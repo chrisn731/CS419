@@ -24,22 +24,10 @@ func numLeadingZeros(hash []rune) int {
 	// By looking at each character in the string, we can map a number
 	// of leading zeros to a rune
 	leadingZeros := map[rune]int{
-		'0': 4,
-		'1': 3,
-		'2': 2,
-		'3': 2,
-		'4': 1,
-		'5': 1,
-		'6': 1,
-		'7': 1,
-		'8': 0,
-		'9': 0,
-		'a': 0,
-		'b': 0,
-		'c': 0,
-		'd': 0,
-		'e': 0,
-		'f': 0,
+		'0': 4, '1': 3, '2': 2, '3': 2,
+		'4': 1, '5': 1, '6': 1, '7': 1,
+		'8': 0, '9': 0, 'a': 0, 'b': 0,
+		'c': 0, 'd': 0, 'e': 0, 'f': 0,
 	}
 	num := 0
 	for _, r := range hash {
@@ -63,17 +51,14 @@ func checkMissing(lines []string) []*string {
 	}
 	var res []*string
 	for _, header := range headers {
-		found := false
+		var found_line *string = nil
 		for _, line := range lines {
 			if strings.Contains(line, header) {
-				found = true
-				res = append(res, &line)
+				found_line = &line
 				break
 			}
 		}
-		if !found {
-			res = append(res, nil)
-		}
+		res = append(res, found_line)
 	}
 	return res
 
