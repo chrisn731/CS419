@@ -70,14 +70,18 @@ func checkInitHash(line *string, initHash string) bool {
 		return true
 	}
 	val := strings.Split(*line, ": ")
-	if initHash == val[1] {
+	hashInHeader := ""
+	if len(val) == 2 {
+		hashInHeader = val[1]
+	}
+	if initHash == hashInHeader {
 		fmt.Println("PASSED: initial file hashes match")
 		return false
 	} else {
 		fmt.Printf("ERROR initial hashes don't match\n" +
 			"\thash in header: %s\n" +
 			"\tfile hash: %s\n",
-			val[1], initHash)
+			hashInHeader, initHash)
 		return true
 	}
 }
@@ -116,7 +120,9 @@ func checkProofHash(line *string, initHash, work string) bool {
 		return true
 	} else {
 		val := strings.Split(*line, ": ")
-		given = val[1]
+		if len(val) == 2 {
+			given = val[1]
+		}
 	}
 
 	h := sha256.New()
@@ -140,13 +146,17 @@ func doHeaderChecks(lines []*string, initHash string) bool {
 	proofHash := ""
 	if lines[3] != nil {
 		t := strings.Split(*lines[3], ": ")
-		proofHash = t[1]
+		if len(t) == 2 {
+			proofHash = t[1]
+		}
 	}
 
 	work := ""
 	if lines[1] != nil {
 		t := strings.Split(*lines[1], ": ")
-		work = t[1]
+		if len(t) == 2 {
+			work = t[1]
+		}
 	}
 	fail1 := checkInitHash(lines[0], initHash)
 	fail2 := checkProofOfWork(lines[1])
